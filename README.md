@@ -43,7 +43,39 @@ npm run dev
 
 ## Procédure de déploiement
 
-_À documenter aux étapes 2-3 (création des apps Scalingo, buildpacks, migrations en production)._
+Deux apps Scalingo, région `osc-fr1` (Paris), déployées par `git push` (pas encore liées à GitHub, voir étape « Automatiser ») :
+
+- **API** : `mohand-deploiement-api` — https://mohand-deploiement-api.osc-fr1.scalingo.io
+- **Client** : `mohand-deploiement-client` — https://mohand-deploiement-client.osc-fr1.scalingo.io
+
+Mise en place (faite une fois) :
+
+```bash
+scalingo create mohand-deploiement-api --remote scalingo-api
+scalingo create mohand-deploiement-client --remote scalingo-client
+
+scalingo --app mohand-deploiement-api env-set PROJECT_DIR=api
+scalingo --app mohand-deploiement-client env-set PROJECT_DIR=client
+
+scalingo --app mohand-deploiement-api addons-add postgresql postgresql-starter-512
+# SCALINGO_POSTGRESQL_URL est alors injectée automatiquement
+
+scalingo --app mohand-deploiement-api env-set CORS_ORIGINS=https://mohand-deploiement-client.osc-fr1.scalingo.io
+scalingo --app mohand-deploiement-client env-set VITE_API_URL=https://mohand-deploiement-api.osc-fr1.scalingo.io
+
+# Taille S suffisante pour les deux apps (voir « Coût »)
+scalingo --app mohand-deploiement-api scale web:1:S
+scalingo --app mohand-deploiement-client scale web:1:S
+```
+
+Pour déployer une mise à jour :
+
+```bash
+git push scalingo-api master      # API : build Python, puis postdeploy (alembic upgrade head)
+git push scalingo-client master   # Client : build Vite (VITE_API_URL figée à ce moment-là)
+```
+
+Contrôlé après déploiement : `GET /health` et `GET /docs` répondent `200` sur l'API ; le client affiche la liste des notes et permet d'en créer une (écriture puis lecture réelles en base), sans erreur CORS dans la console.
 
 ## Variables d'environnement
 
