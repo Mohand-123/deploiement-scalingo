@@ -43,7 +43,7 @@ npm run dev
 
 ## Procédure de déploiement
 
-Deux apps Scalingo, région `osc-fr1` (Paris), déployées par `git push` (pas encore liées à GitHub, voir étape « Automatiser ») :
+Deux apps Scalingo, région `osc-fr1` (Paris), liées au dépôt GitHub [`Mohand-123/deploiement-scalingo`](https://github.com/Mohand-123/deploiement-scalingo) avec déploiement automatique sur `master` (voir « Automatiser ») :
 
 - **API** : `mohand-deploiement-api` — https://mohand-deploiement-api.osc-fr1.scalingo.io
 - **Client** : `mohand-deploiement-client` — https://mohand-deploiement-client.osc-fr1.scalingo.io
@@ -68,14 +68,16 @@ scalingo --app mohand-deploiement-api scale web:1:S
 scalingo --app mohand-deploiement-client scale web:1:S
 ```
 
-Pour déployer une mise à jour :
-
-```bash
-git push scalingo-api master      # API : build Python, puis postdeploy (alembic upgrade head)
-git push scalingo-client master   # Client : build Vite (VITE_API_URL figée à ce moment-là)
-```
+Pour déployer une mise à jour : `git push origin master`. Les deux apps sont liées au dépôt GitHub (compte Mohand-123, intégration SCM) avec déploiement automatique activé sur `master` — chaque push y déploie l'API et le client sans action manuelle. Les remotes `scalingo-api` / `scalingo-client` restent disponibles en secours pour un déploiement manuel (`git push scalingo-api master`).
 
 Contrôlé après déploiement : `GET /health` et `GET /docs` répondent `200` sur l'API ; le client affiche la liste des notes et permet d'en créer une (écriture puis lecture réelles en base), sans erreur CORS dans la console.
+
+## Automatiser
+
+- Dépôt GitHub : https://github.com/Mohand-123/deploiement-scalingo (privé)
+- Intégration SCM Scalingo ↔ GitHub : compte GitHub `Mohand-123` connecté dans Account > SCM Integrations
+- Les deux apps sont liées à ce dépôt, branche `master`, déploiement automatique activé (Deploy > Configuration > GitHub)
+- CI : à ajouter (`.github/workflows/`) — lint + tests api (pytest) et build client (tsc + vite build), filtrés par chemin (`api/**`, `client/**`)
 
 ## Variables d'environnement
 
