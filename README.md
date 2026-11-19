@@ -77,7 +77,9 @@ Contrôlé après déploiement : `GET /health` et `GET /docs` répondent `200` s
 - Dépôt GitHub : https://github.com/Mohand-123/deploiement-scalingo (privé)
 - Intégration SCM Scalingo ↔ GitHub : compte GitHub `Mohand-123` connecté dans Account > SCM Integrations
 - Les deux apps sont liées à ce dépôt, branche `master`, déploiement automatique activé (Deploy > Configuration > GitHub)
-- CI : à ajouter (`.github/workflows/`) — lint + tests api (pytest) et build client (tsc + vite build), filtrés par chemin (`api/**`, `client/**`)
+- CI : `.github/workflows/api.yml` et `client.yml` — lint (ruff) + tests (pytest) côté API, build (tsc + vite build) côté client, déclenchés uniquement sur le dossier modifié (`api/**`, `client/**`)
+
+⚠️ **Limite connue** : GitHub Actions ne s'exécute pas actuellement sur ce compte GitHub (`Mohand-123`) — le budget "Actions" y est fixé à 0 € et son édition exige une carte bancaire enregistrée (`Settings > Billing and licensing > Payment information`), non faite à ce jour. Les workflows sont écrits et validés en local (`ruff check .` et `pytest -q` passent). Conséquence vérifiée en conditions réelles : un commit cassant volontairement l'API (import inexistant) a tout de même été déployé et a planté en production (voir « En cas de panne »), alors que des GitHub Actions vertes auraient dû l'en empêcher — la CI ne protège donc pas encore le déploiement sur ce compte, uniquement à cause de ce blocage de facturation, pas du code.
 
 ## Variables d'environnement
 
