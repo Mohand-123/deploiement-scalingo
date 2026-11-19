@@ -2,6 +2,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+import nonexistent_module_for_incident_drill  # noqa: F401
 
 from app.config import settings
 from app.database import get_db
