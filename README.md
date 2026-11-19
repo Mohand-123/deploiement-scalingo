@@ -104,4 +104,57 @@ _Estimation à faire avec le simulateur de prix Scalingo avant de créer les res
 
 ## En cas de panne
 
-_À documenter à l'étape 5 : commandes de logs, rollback, sauvegarde et restauration de la base, réellement testées._
+### Lire les logs
+
+```bash
+scalingo --app mohand-deploiement-api logs --lines 200
+scalingo --app mohand-deploiement-api logs --addon ad-232c660f-de28-4cb7-ac27-a9061c8839b6 --lines 200  # logs de la base
+```
+
+**Testé réellement** le 19/11 : un import cassé (`import nonexistent_module_for_incident_drill`) a été poussé volontairement sur `api/app/main.py`. Le build a réussi mais le déploiement est passé en statut `crashed-error` ; `/health` a continué à répondre (l'ancien conteneur restait actif) jusqu'à ce que `scalingo apps` confirme le crash. Les logs ont immédiatement montré la cause :
+
+```
+ModuleNotFoundError: No module named 'nonexistent_module_for_incident_drill'
+```
+
+### Rollback
+
+Les deux apps sont liées à GitHub avec déploiement automatique sur `master` (pas de commande `scalingo rollback` dédiée pour ce mode). Pour revenir en arrière : `git revert <commit-cassé> && git push` — le revert redéclenche l'auto-deploy avec le code d'avant.
+
+**Testé réellement** : le commit cassé ci-dessus a été annulé avec `git revert --no-edit <sha>` puis poussé ; nouveau déploiement en `success` en 48s, `/health` de nouveau à `200`.
+
+### Sauvegarder / restaurer PostgreSQL
+
+```bash
+scalingo --app mohand-deploiement-api backups --addon <addon-id>                 # lister les sauvegardes (auto quotidiennes)
+scalingo --app mohand-deploiement-api backups-create --addon <addon-id>          # forcer une sauvegarde
+scalingo --app mohand-deploiement-api backups-download --addon <addon-id> \
+  --backup <backup-id> --output backup.sql.gz                                    # télécharger
+```
+
+Restauration (toujours sur une base locale jetable, jamais sur la prod) :
+
+```bash
+gunzip backup.sql.gz && tar -xf backup.sql          # l'archive téléchargée est un tar contenant le dump pg_dump custom
+pg_restore --no-owner --dbname "$DATABASE_URL" <fichier>.pgsql
+```
+
+**Testé réellement** : backup quotidien du 19/11 téléchargé, puis restauré dans un PostgreSQL local jetable (`docker compose`, aligné en version 18 sur l'addon Scalingo — voir ci-dessous). Les données restaurées (table `notes`, 1 ligne réelle) et la version Alembic ont été vérifiées par requête `SELECT`.
+
+⚠️ Point trouvé en testant : l'addon Scalingo tourne en **PostgreSQL 18.6**, alors que `docker-compose.yml` était resté en `postgres:16-alpine` — corrigé en `postgres:18-alpine` pour que l'environnement local corresponde réellement à la prod (sinon un `pg_restore` local échoue avec `unsupported version`, et la parité dev/prod n'est que de façade).
+
+### Metrics (mémoire / CPU)
+
+```bash
+scalingo --app mohand-deploiement-api stats
+scalingo --app mohand-deploiement-client stats
+```
+
+**Relevé réel** le 19/11 (conteneurs S = 256 MiB) :
+
+| App | Mémoire utilisée | Pic | CPU |
+| --- | --- | --- | --- |
+| API | 78 MiB / 256 MiB (30 %) | 84 MiB | 0 % |
+| Client | 164 MiB / 256 MiB (64 %) | 175 MiB | 0 % |
+
+La taille S suffit largement pour l'API ; le client (serveur statique Node) est plus proche de la limite mais reste confortable. À resurveiller si le trafic augmente.
